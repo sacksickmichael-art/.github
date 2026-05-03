@@ -1,0 +1,77 @@
+name: Weekly Analytics Report
+
+# Sends a weekly traffic & SEO report by email every Monday at 07:00 UTC.
+# Recipient: sacksick.michael@gmail.com (configurable via REPORT_RECIPIENT secret).
+#
+# Required GitHub repository secrets:
+#   GA4_PROPERTY_ID         — e.g. "123456789" (Admin → Property Settings in GA4)
+#   GA4_SERVICE_ACCOUNT_JSON — full JSON contents of a service account key with
+#                             "Viewer" access on the GA4 property
+#   SMTP_HOST               — e.g. "smtp.gmail.com"
+#   SMTP_PORT               — e.g. "465"
+#   SMTP_USER               — sender email account
+#   SMTP_PASSWORD           — app password (NOT the account password)
+#   REPORT_RECIPIENT        — sacksick.michael@gmail.com
+#
+# To run on demand: Actions tab → "Weekly Analytics Report" → Run workflow.
+
+on:
+  schedule:
+    # Every Monday at 07:00 UTC
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-send-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install google-analytics-data==0.18.* jinja2==3.1.*
+
+      - name: Generate weekly report
+        env:
+          GA4_PROPERTY_ID: ${{ secrets.GA4_PROPERTY_ID }}
+          GA4_SERVICE_ACCOUNT_JSON: ${{ secrets.GA4_SERVICE_ACCOUNT_JSON }}
+        run: |
+          python scripts/weekly_report.py \
+            --output-html report.html \
+            --output-text report.txt
+
+      - name: Send email
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_HOST }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USER }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "Blue Sea Angels — Weekly traffic report"
+          to: ${{ secrets.REPORT_RECIPIENT }}
+          from: "Blue Sea Angels Analytics <${{ secrets.SMTP_USER }}>"
+          html_body: file://report.html
+          body: file://report.txt
+          convert_markdown: false
+
+      - name: Upload report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-report-${{ github.run_id }}
+          path: |
+            report.html
+            report.txt
+          retention-days: 90
