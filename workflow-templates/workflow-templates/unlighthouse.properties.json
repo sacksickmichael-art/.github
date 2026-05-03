@@ -1,6 +1,0 @@
-{
-  "name": "Unlighthouse SEO Audit",
-  "description": "Audit perf/SEO/accessibilité de ton site déployé chaque lundi",
-  "iconName": "octicon octicon-graph",
-  "categories": ["Code Quality", "SEO"]
-}
